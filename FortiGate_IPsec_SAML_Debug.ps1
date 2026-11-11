@@ -142,6 +142,14 @@ try {
     }
 
     Write-Log $PrecheckLog (Invoke-FgtCommand $dbg 'show user saml')
+
+    # IKE sobre TCP (FortiOS 7.4): puerto en system settings y 'transport' en la phase1
+    $sett = Invoke-FgtCommand $dbg 'show full-configuration system settings | grep ike-tcp-port'
+    Write-Log $PrecheckLog $sett
+    $IkeTcpPort = if ($sett -match 'ike-tcp-port\s+(\d+)') { [int]$Matches[1] } else { 4500 }
+    if ($p1 -match 'set transport (tcp|auto)') {
+        Write-Host "    Phase1 permite IKE sobre TCP (transport $($Matches[1])), puerto TCP $IkeTcpPort"
+    }
     Write-Log $PrecheckLog (Invoke-FgtCommand $dbg 'diagnose sys ntp status' -TimeoutSec 10)
     #endregion
 
@@ -184,7 +192,7 @@ try {
             [void](Invoke-FgtCommand $snf 'config vdom')
             [void](Invoke-FgtCommand $snf "edit $Vdom")
         }
-        $filter = "host $RemoteIP and (udp port 500 or udp port 4500 or tcp port $SamlPort)"
+        $filter = "host $RemoteIP and (udp port 500 or udp port 4500 or tcp port $IkeTcpPort or tcp port $SamlPort)"
         $snf.WriteLine("diagnose sniffer packet any '$filter' 4 0 l")
     }
 
